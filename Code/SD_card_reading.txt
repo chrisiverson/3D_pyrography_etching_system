@@ -1,0 +1,9 @@
+File dataFile = SD.open("Strip3_5.txt");
+if (datafile) {
+  for (index = 0; index <= 9; index++) {
+    int input = datafile.parseInt();
+    String3_5[index] = input;
+    Serial.println(input);
+  }
+  file.close();
+}

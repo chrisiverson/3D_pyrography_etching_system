@@ -1,0 +1,25 @@
+clc
+clear all
+close all
+
+num_of_steps = [6456,3503,2893,1937,1726];
+perc_arduino_memory = [321,177,147,100,90];
+total_storage_bytes = [26318,14506,12066,8342,7398];
+
+figure(1)
+plot(num_of_steps,perc_arduino_memory)
+xlabel('Number of Machine Steps')
+ylabel('Percentage of Arduino Memory')
+
+figure(2)
+plot(num_of_steps,total_storage_bytes)
+xlabel('Number of Machine Steps')
+ylabel('Total Storage (Bytes)')
+
+figure(3)
+plot(total_storage_bytes,perc_arduino_memory)
+xlabel('Total Storage (Bytes)')
+ylabel('Percentage of Arduino Memory')
+
+ f(x) = p1*x + p2
+ 

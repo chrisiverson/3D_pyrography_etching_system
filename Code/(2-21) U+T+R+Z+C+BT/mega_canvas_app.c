@@ -1,0 +1,819 @@
+/*
+2-axis joystick connected to an Arduino Micro
+to output 4 pins, up, down, left & right
+If you are using pull down resistors, change all the HIGHs to LOWs and LOWs to HIGH.
+This skectch is using pull up resistors.
+*/
+#include "image_data.h"
+
+// 0 - Hand Control, 1 - Image data, 2 - Diamond
+int image_choice = 1;
+
+int drawing_image = 0;
+int current_step = 0;
+int image_done = 0;
+
+String readString;
+
+int automatic = 1;
+int UD = 0;
+int LR = 0;
+
+int z_with_object_ht = 5000;
+int reset_step = 0;
+
+/* Arduino Micro output pins*/
+int DWN = 27;
+int UP = 29;
+int LEFT = 31;
+int RT = 33;
+/* Arduino Micro Input Pins */
+int IUP=59;//A5
+int ILR=63;//A9
+
+int MID = 33; // 33 mid point delta arduino, use 4 for attiny
+int LRMID = 0;
+int UPMID = 0;
+char BTF = 0;
+
+
+const int x_endstopPin_min = 3; // endstop for x-axis (min)
+const int x_endstopPin_max = 2; // endstop for x-axis (max)
+
+const int y_endstopPin_min = 14; // endstop for y-axis (min)
+const int y_endstopPin_max = 15; // endstop for y-axis (max)
+
+const int z_endstopPin_min = 18; // endstop for z-axis (min)
+const int z_endstopPin_max = 19; // endstop for z-axis (max)
+
+const int z_endstopPin_cal = 45; // endstop for z-axis (calibration)
+
+const int buttonPin = 47; //D47    // the number of the pushbutton pin
+const int buttonPin2 = 32; //D32
+const int ledPin =  23;      // the number of the LED pin
+
+int buttonState = 0;         // variable for reading the pushbutton status
+int buttonState2 = 0;
+
+int x_endstopvar_min = 0; //these states will contain value from reading input values
+int x_endstopvar_max = 0;
+int y_endstopvar_min = 0;
+int y_endstopvar_max = 0;
+int z_endstopvar_min = 0;
+int z_endstopvar_max = 0;
+int z_endstopvar_cal = 0;
+
+
+int temperature_ready =0;
+
+////////////////////// COMMUNICATION VARIABLES //////////////////
+int percentage_complete = 0;
+int past_percentage = 0;
+////////////////////// COMMUNICATION VARIABLES //////////////////
+
+///////////////////////////////////////DELAY VARIABLES//////////////////////////////////////
+int automatic_delay_speed = 500; //standard delay
+int manual_delay_speed = 500;    //standard delay
+
+
+//INPUTS
+int XL = 0;
+int XR = 0;
+int YU = 0;
+int YD = 0;
+int ZU = 0;
+int ZD = 0;
+
+/////////////////////////////////////DIAMOND SHIT//////////////////////////////////
+int XL1 = 1000;
+int XR1 = 0;
+int YU1 = 0;
+int YD1 = 1000;
+int ZU1 = 0;
+int ZD1 = 0;
+
+int XL2 = 0;
+int XR2 = 1000;
+int YU2 = 0;
+int YD2 = 1000;
+int ZU2 = 0;
+int ZD2 = 0;
+
+int XL3 = 1000;
+int XR3 = 0;
+int YU3 = 0;
+int YD3 = 1000;
+int ZU3 = 0;
+int ZD3 = 0;
+
+int XL4 = 0;
+int XR4 = 1000;
+int YU4 = 0;
+int YD4 = 1000;
+int ZU4 = 0;
+int ZD4 = 0;
+
+int XL5 = 0;
+int XR5 = 1000;
+int YU5 = 1000;
+int YD5 = 0;
+int ZU5 = 0;
+int ZD5 = 0;
+
+int XL6 = 1000;
+int XR6 = 0;
+int YU6 = 1000;
+int YD6 = 0;
+int ZU6 = 0;
+int ZD6 = 0;
+
+int XL7 = 0;
+int XR7 = 1000;
+int YU7 = 1000;
+int YD7 = 0;
+int ZU7 = 0;
+int ZD7 = 0;
+
+int XL8 = 1000;
+int XR8 = 0;
+int YU8 = 1000;
+int YD8 = 0;
+int ZU8 = 0;
+int ZD8 = 0;
+
+int XLEND = 0;
+int XREND = 0;
+int YUEND = 0;
+int YDEND = 0;
+int ZUEND = 0;
+int ZDEND = 0;
+
+
+int YUCount = 0;
+int XRCount = 0;
+
+//Demo pattern
+int Done = 1;
+int move_num = 0;
+int printing = 0;
+
+int readinput = 0;
+
+
+
+
+
+
+/////////////////////////////////////////////// RESET FUNCTION //////////////////////////////////
+int at_home = 0;
+int running_reset = 0;
+int reset = 0;
+int actually_reset = 0;
+
+void resetfunction()
+{
+  //Serial.println("Function called");
+  //Serial.println(XR);
+  if(at_home == 0 && running_reset == 0 && reset == 0)
+  {
+    running_reset = 1;
+    //Serial.println("Reseting the platform...");
+    Serial2.write(5);
+    XL = 10000;
+    YD = 10000;
+    ZU = 10000;
+  }
+  else if (running_reset == 1 && at_home == 1)
+  {
+    //Serial.println("Platform reset\n");
+    
+    XL = 0;
+    YD = 0;
+    YU = 7000;
+    XR = 1100;
+    running_reset = 0;
+    reset = 1;
+
+  }
+  
+  return;
+}
+
+/////////////////////////////////////////////// CENTER FUNCTION //////////////////////////////////
+int running_center = 0;
+int centered = 0;
+void centerfunction()
+{
+  //Serial.println("Function called");
+  //Serial.println(XR);
+
+    
+    
+    if (running_center == 0)
+    {
+      XR = 4000;
+      YU = 4000;
+      running_center =1;
+      //Serial.println("Centering...");
+      Serial2.write(7);
+    }
+    if (XR == 0 && YU == 0)
+    {
+      centered=1;
+      running_center=0;
+      //Serial.println("Centered\n");
+      automatic = 0;
+      Serial2.write(8);
+      delay(500);
+    }
+  
+  return;
+}
+
+/////////////////////////////////////////////// MOVER FUNCTION //////////////////////////////////
+void mover()
+{
+  
+  Done = 0;
+
+    XL = XL1;
+    XR = XR1;
+    YU = YU1;
+    YD = YD1;
+    ZU = ZU1;
+    ZD = ZD1;
+
+    XL1 = XL2;
+    XR1 = XR2;
+    YU1 = YU2;
+    YD1 = YD2;
+    ZU1 = ZU2;
+    ZD1 = ZD2;
+
+    XL2 = XL3;
+    XR2 = XR3;
+    YU2 = YU3;
+    YD2 = YD3;
+    ZU2 = ZU3;
+    ZD2 = ZD3;
+
+    XL3 = XL4;
+    XR3 = XR4;
+    YU3 = YU4;
+    YD3 = YD4;
+    ZU3 = ZU4;
+    ZD3 = ZD4;
+
+    XL4 = XL5;
+    XR4 = XR5;
+    YU4 = YU5;
+    YD4 = YD5;
+    ZU4 = ZU5;
+    ZD4 = ZD5;
+    
+    XL5 = XL6;
+    XR5 = XR6;
+    YU5 = YU6;
+    YD5 = YD6;
+    ZU5 = ZU6;
+    ZD5 = ZD6;
+    
+    XL6 = XL7;
+    XR6 = XR7;
+    YU6 = YU7;
+    YD6 = YD7;
+    ZU6 = ZU7;
+    ZD6 = ZD7;
+    
+    XL7 = XL8;
+    XR7 = XR8;
+    YU7 = YU8;
+    YD7 = YD8;
+    ZU7 = ZU8;
+    ZD7 = ZD8;
+    
+    XL8 = XLEND;
+    XR8 = XREND;
+    YU8 = YUEND;
+    YD8 = YDEND;
+    ZU8 = ZUEND;
+    ZD8 = ZDEND;
+    move_num++;
+
+
+  return;
+}
+
+
+void setup(){
+
+pinMode(inPin, INPUT);
+pinMode(outPin, OUTPUT);
+
+ 
+  Serial.begin(9600);      // start serial communication at 9600bps
+  Serial2.begin(9600);     // start serial1 communication at 9600bps
+
+  
+
+  
+  pinMode(ledPin, OUTPUT);
+  // initialize the pushbutton pin as an input:
+  pinMode(buttonPin, INPUT);
+
+
+  pinMode(x_endstopPin_min, INPUT);
+  pinMode(x_endstopPin_max, INPUT);
+  pinMode(y_endstopPin_min, INPUT);
+  pinMode(y_endstopPin_max, INPUT);
+  pinMode(z_endstopPin_min, INPUT);
+  pinMode(z_endstopPin_max, INPUT);
+  pinMode(z_endstopPin_cal, INPUT);
+  
+  pinMode(DWN, OUTPUT);
+  pinMode(UP, OUTPUT);  
+  pinMode(LEFT, OUTPUT); 
+  pinMode(RT, OUTPUT);
+
+   
+  digitalWrite(DWN, HIGH);
+  digitalWrite(UP, HIGH);
+  digitalWrite(LEFT, HIGH);
+  digitalWrite(RT, HIGH);
+  
+  //calabrate center
+  LRMID = analogRead(ILR);
+  UPMID = analogRead(IUP);
+
+  pinMode(38, OUTPUT); //Enable X   // old 6
+  pinMode(54, OUTPUT); //Step   X   // old 5
+  pinMode(55, OUTPUT); //Direction // old 4
+
+
+  pinMode(56, OUTPUT);// Enable Y
+  pinMode(60, OUTPUT);// Step Y
+  pinMode(61, OUTPUT);// Direction Y
+  //digitalWrite(38,LOW);
+  
+  pinMode(62, OUTPUT);// Enable Z
+  pinMode(46, OUTPUT);// Step Z
+  pinMode(48, OUTPUT);// Direction Z
+  
+}
+
+void loop(){
+
+  //Serial.println(automatic);
+
+ buttonState = digitalRead(buttonPin);
+  buttonState2 = digitalRead(buttonPin2);
+
+  
+  UD = analogRead(IUP);
+  LR = analogRead(ILR);
+  
+  if (UD < (UPMID+10) && (UD > (UPMID-20)))// original  = (UPMID-10)
+      UD = UPMID;
+  if (LR < (LRMID+10) && (LR > (LRMID-20)))
+      LR = LRMID;
+  
+  //z-direction button UP
+  int buttonvar = buttonState;
+  int buttonvar2 = buttonState2;
+
+  int x_endstopvar_min = digitalRead(x_endstopPin_min); //this obtains the "1" or "0" from endstop signal
+  int x_endstopvar_max = digitalRead(x_endstopPin_max);
+  int y_endstopvar_min = digitalRead(y_endstopPin_min);
+  int y_endstopvar_max = digitalRead(y_endstopPin_max);
+  int z_endstopvar_min = digitalRead(z_endstopPin_min);
+  int z_endstopvar_max = digitalRead(z_endstopPin_max); 
+  int z_endstopvar_cal = digitalRead(z_endstopPin_cal);
+
+if(Serial2.available() > 0)
+{
+  readinput = Serial2.read();
+  /*if(readinput == 20)
+  {
+    temperature_ready = 1;
+  }
+  else if(readinput == 21)
+  {
+    temperature_ready = 0;
+  }*/
+}
+
+////////////////////RESET///////////////////////
+
+if (!actually_reset)
+{
+if (!reset)
+{
+   resetfunction();
+}
+
+if ( XR == 0 && XL == 0 && YU == 0 && YD == 0 && reset && z_endstopvar_cal && reset_step == 0)
+{
+    ZU = 0;
+    ZD = 10000;
+    reset_step = 1;
+}
+
+if ( XR == 0 && XL == 0 && YU == 0 && YD == 0 && reset && !z_endstopvar_cal && reset_step == 1)
+{
+  ZU = 10000;
+  XL = 1000;
+  YD = 3000;
+  ZD = 0;
+  z_with_object_ht = 0;
+  reset_step = 2;
+}
+
+if (ZD == 0 && XR == 0 && reset_step == 2 && z_endstopvar_cal && !z_endstopvar_max && image_choice == 0)
+{
+  automatic = 0;
+  ZD = 0;
+  ZU = 0;
+  actually_reset = 1;
+  Serial2.write(6);
+}
+else if (ZD == 0 && XR == 0 &&reset_step == 2 && z_endstopvar_cal && !z_endstopvar_max && image_choice == 1)
+{
+  automatic = 2;
+  ZD = 0;
+  ZU = 0;
+  actually_reset = 1;
+  Serial2.write(6);
+}
+}
+
+if (automatic == 2 && buttonvar2 && actually_reset)
+  automatic = 1;
+  
+
+///////////////////////AUTO-IMAGE DRAWING/////////////////////////////
+if (actually_reset && image_choice == 1 && drawing_image == 0 && image_done == 0 && automatic == 1)
+{
+  drawing_image = 1;
+  current_step = sizeof(move_list)/8;
+  //Serial.println(sizeof(move_list)/8);
+}
+
+
+if (drawing_image && XR == 0 && XL == 0 && YU == 0 && YD == 0 && image_done == 0)
+{
+    XL = 10*move_list[(num_of_steps-current_step)*4];
+    XR = 10*move_list[((num_of_steps-current_step)*4)+1];
+    YD = 10*move_list[((num_of_steps-current_step)*4)+2];
+    YU = 10*move_list[((num_of_steps-current_step)*4)+3];
+    
+    current_step--;
+    percentage_complete = (100 - ((float(current_step) / float(num_of_steps))*100) + (150));
+    
+    
+    if((percentage_complete != past_percentage) && (percentage_complete > 150) && (percentage_complete % 2))
+    {
+      Serial2.write(percentage_complete);
+      //Serial.println(percentage_complete);
+      past_percentage = percentage_complete;
+    }
+    else if (percentage_complete == 250)
+    {
+      drawing_image = 0;
+      automatic = 0;
+      image_done = 1;
+      percentage_complete = 250;
+      Serial2.write(percentage_complete);
+      drawing_image = 2;
+    }
+}
+
+
+
+
+//Serial.println(automatic);
+
+
+
+
+
+  
+// RELAY SWITCH CODE //
+///////////////////////////////////BLUETOOTH BEGIN/////////////////////////////////
+  while (Serial.available()) {
+    delay(3);  
+    char c = Serial.read();
+    readString += c; 
+  }
+
+
+if (readString.length() >0) {
+    Serial.println(readString);
+    
+    if(readString == "UP")
+    {
+      BTF = 1;
+    }
+    else if(readString == "DOWN")
+    {
+      BTF = 2;
+    }
+    else if(readString == "LEFT")
+    {
+      BTF = 4;
+    }
+    else if(readString == "RIGHT")
+    {
+      BTF = 3;
+    }
+    else if(readString == "DR")
+    {
+      BTF = 5;
+    }
+    else if(readString == "DL")
+    {
+      BTF = 6;
+    }
+    else if(readString == "UR")
+    {
+      BTF = 7;
+    }
+    else if(readString == "UL")
+    {
+      BTF = 8;
+    }
+    else if(readString == "ZUP")
+    {
+      BTF = 9;
+    }
+    else if(readString == "ZDOWN")
+    {
+      BTF = 10;
+    }
+    else if(readString == "LIGHT")
+    {
+      automatic_delay_speed = 300; //faster motor speed --> lighter shade
+    }
+    else if(readString == "MEDIUM")
+    {
+      automatic_delay_speed = 500; //use standard delay speed for medium
+    }
+    else if(readString == "DARK")
+    {
+      automatic_delay_speed = 800; //slower motor speed --> darker shade
+    }
+    else if (readString == "off")
+    {
+      BTF = 0;
+    }
+    
+    
+    readString="";
+  }
+
+
+  //Serial.println(z_endstopvar_cal);
+
+if ((x_endstopvar_min == 0) && (y_endstopvar_max == 0))
+{
+  at_home = 1;
+}
+
+else if ((x_endstopvar_min == 1) || (y_endstopvar_max ==1))
+{
+  at_home = 0;
+}  
+
+//////////////////???CENTERING CODE/////////////////////////////
+/*
+  if ((Done && (move_num < 9) && centered) && temperature_ready)
+  {
+    //Serial.println("yes");
+    if (!printing)
+    {
+      
+      //Serial.println("Drawing the diamonds...");
+      Serial2.write(9);
+    }
+   
+   mover();
+   
+   printing = 1;
+  }
+ */
+ 
+  if ( XR == 0 && XL == 0 && YU == 0 && YD == 0 && printing)
+  {
+    
+    Done = 1;
+    if (move_num == 9 && printing)
+    {
+      printing = 0;
+      automatic = 0;
+      //Serial.println("Diamonds complete.\n");
+      Serial2.write(10);
+    }
+  }
+
+////////////////////////Automatic control///////////////////////
+ if(automatic == 1)
+  {
+    if (ZU > 0 && z_endstopvar_max) 
+{
+    // turn LED on:
+  z_with_object_ht++;
+   digitalWrite(48,LOW);//direction
+   digitalWrite(46,HIGH);//step
+   digitalWrite(46,LOW);//step
+} 
+
+else if(!buttonvar)
+{
+   digitalWrite(46,LOW);
+}
+
+if (ZD > 0 && z_endstopvar_min && z_endstopvar_cal && z_with_object_ht > 0) 
+{
+  z_with_object_ht--;
+    // turn LED on:
+   digitalWrite(ledPin, HIGH);
+  // Serial.println("LED on");
+    
+   digitalWrite(48,HIGH);//direction
+   digitalWrite(46,HIGH);//step
+   digitalWrite(46,LOW);//step   
+   //delayMicroseconds(200);
+}  
+
+ else if(!buttonvar/* || !buttonvar2*/)
+{
+   digitalWrite(46,LOW);
+} 
+
+  // y-direction UP
+  if((((YU > 0)) && y_endstopvar_min ) && (readinput == 0  )){
+   digitalWrite(DWN, LOW);
+   digitalWrite(61,LOW);
+   digitalWrite(UP, LOW);
+   digitalWrite(60,HIGH);
+   //delayMicroseconds(200);
+   YUCount++;
+   YU--;
+    }
+  else
+  {
+   digitalWrite(DWN, HIGH);
+   digitalWrite(60,LOW);
+  }
+  // y-direction DOWN
+  if((((YD > 0) && y_endstopvar_max )) && (readinput == 0))
+  {
+   digitalWrite(UP, LOW);
+   digitalWrite(61,HIGH);
+   //digitalWrite(DWN, LOW);
+   digitalWrite(60,HIGH);
+   //delayMicroseconds(200);
+   //YUCount--;
+   YD--;
+  }
+  else
+  {
+   digitalWrite(UP, HIGH);
+   digitalWrite(60,LOW);
+  }
+  // LEFT-RIGHT
+
+  //x-direciton RIGHT
+  if(((((XR > 0)) && x_endstopvar_max )) && (readinput == 0))
+  {// min
+    
+   digitalWrite(55,HIGH);
+   //digitalWrite(LEFT, LOW);// LEDS
+   digitalWrite(54,HIGH);
+   //delayMicroseconds(200);
+   XRCount++;
+   XR--;
+  }
+  else{
+   digitalWrite(54,LOW);
+   digitalWrite(LEFT, HIGH);
+  }
+
+  //x-direction LEFT
+  if(((((XL > 0)) && x_endstopvar_min )) && (readinput == 0))
+  {
+   digitalWrite(55,LOW);
+   //digitalWrite(RT, LOW);
+   digitalWrite(54,HIGH);
+   //delayMicroseconds(200);
+   //XRCount--;
+   XL--;
+  }else{
+   digitalWrite(54,LOW);
+   digitalWrite(RT, HIGH);
+  }
+  delayMicroseconds(automatic_delay_speed);
+  }
+  automatic_delay_speed = 500; //reset motor speed back to normal if user changes shade intensity of image
+  else
+  {
+
+ ///////////////////////// MANUAL CONTROl //////////
+
+ if ((buttonvar && z_endstopvar_max) || (BTF == 9))
+{
+    // turn LED on:
+   z_with_object_ht++;
+   digitalWrite(48,LOW);//direction
+   digitalWrite(46,HIGH);//step
+   digitalWrite(46,LOW);//step
+} 
+
+else if(!buttonvar)
+{
+   digitalWrite(46,LOW);
+}
+
+if (((buttonvar2 || (BTF == 10)) && z_endstopvar_min && z_endstopvar_cal && z_with_object_ht > 0))
+{
+  z_with_object_ht--;
+    // turn LED on:
+   digitalWrite(ledPin, HIGH);
+  // Serial.println("LED on");
+    
+   digitalWrite(48,HIGH);//direction
+   digitalWrite(46,HIGH);//step
+   digitalWrite(46,LOW);//step   
+   //delayMicroseconds(200);
+}  
+ else
+{
+   digitalWrite(46,LOW);
+} 
+// y-direction UP
+  if(((((UD < UPMID - MID) || ((BTF == 1) || (BTF == 7)|| (BTF == 8)))) && y_endstopvar_min )){
+   digitalWrite(DWN, LOW);
+   digitalWrite(61,LOW);
+   digitalWrite(UP, LOW);
+   digitalWrite(60,HIGH);
+   //delayMicroseconds(200);
+   YUCount++;
+   YU--;
+    }
+  else
+  {
+   digitalWrite(DWN, HIGH);
+   digitalWrite(60,LOW);
+  }
+  // y-direction DOWN
+   if((((((UD > UPMID + MID) || ((BTF == 2) || (BTF == 5)|| (BTF == 6)) || (YD > 0)) && y_endstopvar_max ))))
+  {
+   digitalWrite(UP, LOW);
+   digitalWrite(61,HIGH);
+   //digitalWrite(DWN, LOW);
+   digitalWrite(60,HIGH);
+   //delayMicroseconds(200);
+   //YUCount--;
+   YD--;
+  }
+  else
+  {
+   digitalWrite(UP, HIGH);
+   digitalWrite(60,LOW);
+  }
+  // LEFT-RIGHT
+
+  //x-direciton RIGHT
+  //if(((((LR < LRMID - MID) || (XR > 0)) && x_endstopvar_max )) && (temperature_ready))
+  if((((((LR < LRMID - MID)|| ((BTF == 3)|| (BTF == 5)|| (BTF == 7))) || (XR > 0)) && x_endstopvar_max )))
+  {// min
+    
+   digitalWrite(55,HIGH);
+   //digitalWrite(LEFT, LOW);// LEDS
+   digitalWrite(54,HIGH);
+   //delayMicroseconds(200);
+   XRCount++;
+   XR--;
+  }
+  else{
+   digitalWrite(54,LOW);
+   digitalWrite(LEFT, HIGH);
+  }
+
+  //x-direction LEFT
+  //if(((((LR > LRMID + MID) || (XL > 0)) && x_endstopvar_min )) && (temperature_ready))
+  if((((((LR > LRMID + MID)|| (( BTF == 4 )|| (BTF == 6)|| (BTF == 8))) || (XL > 0)) && x_endstopvar_min )))
+  {
+   digitalWrite(55,LOW);
+   //digitalWrite(RT, LOW);
+   digitalWrite(54,HIGH);
+   //delayMicroseconds(200);
+   //XRCount--;
+   XL--;
+  }else{
+   digitalWrite(54,LOW);
+   digitalWrite(RT, HIGH);
+  }
+delayMicroseconds(manual_delay_speed);
+  }
+
+}
